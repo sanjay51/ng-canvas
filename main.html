@@ -21,13 +21,36 @@ var Global = {
     canvasHeightPercentage: 0.9,
     menuDragableHeight: 35, //The pixels at the top of the menus to drag it around
     defaultBackground: "gray",
-    anchorColor: "yellow",
+    anchorColor: "white",
     anchorRadius: 7,
-    menuStack: 1
+    menuStack: 1,
+    displayTooltips: true
 }
+
+/*
+
+Things to do:
+
+Make the text anchors work, they will dictate the size of the text
+Add pencil
+Add colour wheel
+Undo Redo buttons
+Just make all things rectangular selectable
+Minimise menus maybe
+Add more tools
+Hotkeys? eg delete will delete selected object
+Right click to unselect?
+
+Add optional snap to grid
+
+clean up code, add multiple files maybe and fix up images folder
+*/
+
+
+
+
+
 //Classes
-
-
 class ColorButton
 {
     constructor(color)
@@ -38,39 +61,50 @@ class ColorButton
 //Make tool class
 var defaultTool = 
 {
+    type: "tool",
     cursor: "auto",
     image: new Image(),
-    imageFile: 'defaultCursor.png',
+    imageFile: 'Images/DefaultTool.png',
+    tooltip: "Select objects",
     mouseDown: function() {
         var priority = false;   //This is to only select one object
 
         //Loop through all objects newest first
         for (var i = Canvas.objects.length-1; i >-1; --i)
         {
-            Canvas.objects[i].selected = false;
-
             if (priority == false)
             {
-                for (var j = 0; j < Canvas.objects[i].anchorPoints.length; ++j)
+                
+                if (Canvas.objects[i].selected==true)
                 {
-                    Canvas.objects[i].anchorPoints[j].selected = false;
-                    Canvas.objects[i].anchorPoints[j].click();
+                    for (var j = 0; j < Canvas.objects[i].anchorPoints.length; ++j)
+                    {
+                        Canvas.objects[i].anchorPoints[j].selected = false;
+                        if (Canvas.objects[i].anchorPoints[j].click()==true)
+                        {
+                            Canvas.objects[i].selected = true;
+                            priority = true;
+                            break;
+                        }
+                    }
                 }
-                if (Canvas.objects[i].click()==true)
+                else
                 {
-                    Canvas.objects[i].selected = true;
-
-                    priority = true;
+                    Canvas.objects[i].selected = false;
+                    if (Canvas.objects[i].click()==true)
+                    {
+                        Canvas.objects[i].selected = true;
+                        priority = true;
+                    }
                 }
+                
+            }
+            else{
+                Canvas.objects[i].selected = false;
             }
         }
 
     },
-    mouseMove: function() {}
-}
-var moveTool = {
-    cursor: "move",
-    mouseDown: function() {},
     mouseMove: function() {}
 }
 var Mouse =
@@ -80,10 +114,93 @@ var Mouse =
             x: 0,               
             y: 0
         }
+var moveTool = {
+    type: "tool",
+    cursor: "move",
+    mouseDown: function() {},
+    mouseMove: function() {}
+}
+var moveSelected = {
+    type: "tool",
+    cursor: "move",
+    image: new Image(),
+    imageFile: 'Images/MoveTool.png',
+    tooltip: "Move selected objects",
+    anchor: {x:0,y:0},
+    mouseDown: function() {
+        this.anchor.x = Mouse.x;
+        this.anchor.y = Mouse.y;
+    },
+    mouseMove: function() {
+
+        if (Mouse.state == true)
+        {
+            for (var i = 0; i < Canvas.objects.length; ++i)
+            {
+                if (Canvas.objects[i].selected == true)
+                {
+                    Canvas.objects[i].move(Mouse.x-this.anchor.x,Mouse.y-this.anchor.y);
+                }
+            }
+            this.anchor.x = Mouse.x;
+            this.anchor.y = Mouse.y;
+        }
+        
+
+    }
+}
+var textTool = {
+    type: "tool",
+    cursor: "auto",
+    image: new Image(),
+    imageFile: 'Images/TextTool.png',
+    tooltip: "Type text",
+    anchor: {x: 0, y: 0},
+    mouseDown: function()
+    {
+        for (var i = 0; i < Canvas.objects.length; ++i)
+        {
+            Canvas.objects[i].selected = false;
+        }
+        Canvas.selectedObject = Canvas.objects.length;
+        Canvas.objects.push(new TextObject(Mouse.x,Mouse.y));
+        Canvas.objects[Canvas.objects.length-1].selected = true;
+    },
+    keydown: function(key)
+    {
+        for (var i = 0; i < Canvas.objects.length; ++i)
+        {
+            if (Canvas.objects[i].selected==true)
+            {
+                if (Canvas.objects[i].type=="Text")
+                {
+                    switch (key)
+                    {
+                        case "Backspace":
+                            Canvas.objects[i].text = Canvas.objects[i].text.slice(0,-1);
+                            break;
+                        case "Shift": break;
+                        case "Alt": break;
+                        case "Control": break;
+                        case "OS": break;
+                        case "Enter": break;
+                        case "Escape": break;
+                        default:
+                            Canvas.objects[i].text = Canvas.objects[i].text.concat(key.toString());
+                    }
+                }
+            }
+        }
+        
+    },
+    mouseMove: function(){}
+}
 var pencilTool = {
+    type: "tool",
     cursor: "url('pencilCursor.png'), auto",
     image: new Image(),
-    imageFile: 'pencilCursor.png',
+    imageFile: 'Images/PencilTool.png',
+    tooltip: "Draw freely | NOT IMPLEMENTED YET",
     mouseDown: function()
     {
         //Stroke?
@@ -97,16 +214,19 @@ var pencilTool = {
     }
 }
 var ErasorTool = {
+    type: "tool",
     cursor: "url('Erasor.png'), auto",
     image: new Image(),
-    imageFile: 'Erasor.png',
+    imageFile: 'Images/ErasorTool.png',
+    tooltip: "Delete object",
     mouseDown: function()
     {
-        for (var i = 0; i < Canvas.objects.length; ++i)
+        for (var i = Canvas.objects.length - 1; i > -1 ; --i)
         {
             if (Canvas.objects[i].click()==true)
             {
-                Canvas.objects.splice(i,1);  
+                Canvas.objects.splice(i,1);
+                break;
             }
         }
 
@@ -116,14 +236,80 @@ var ErasorTool = {
 
     }
 }
+var DeleteSelectedButton = {
+    type: "button",
+    image: new Image(),
+    imageFile: 'Images/DeleteButton.png',
+    tooltip: "Delete all selected objects",
+    click: function()
+    {
+        for (var i = 0; i < Canvas.objects.length; ++i)
+        {
+            if (Canvas.objects[i].selected == true)
+            {
+                Canvas.objects.splice(i,1);
+                --i;
+            }
+        }
+    }
+}
+var HelpButton = {
+    type: "button",
+    image: new Image(),
+    imageFile: 'Images/HelpButton.png',
+    tooltip: "Toggle Tooltips",
+    click: function()
+    {
+        Global.displayTooltips == true ? Global.displayTooltips = false : Global.displayTooltips = true;
+    }
+}
+var PushToFrontButton = {
+    type: "button",
+    image: new Image(),
+    imageFile: 'Images/PushTopButton.png',
+    tooltip: "Push selected object to top",
+    click: function()
+    {
+        for (var i = 0; i < Canvas.objects.length; ++i)
+        {
+            if (Canvas.objects[i].selected == true)
+            {
+                Canvas.objects.push(Canvas.objects.splice(i, 1)[0]);
+            }
+        }
+    }
+}
+var PushToBackButton = {
+    type: "button",
+    image: new Image(),
+    imageFile: 'Images/PushBottomButton.png',
+    tooltip: "Push selected object to bottom",
+    click: function()
+    {
+        for (var i = 0; i < Canvas.objects.length; ++i)
+        {
+            if (Canvas.objects[i].selected == true)
+            {
+                Canvas.objects.unshift(Canvas.objects.splice(i, 1)[0]);
+            }
+        }
+    }
+}
 var rectangleShapeTool = {
+    type: "tool",
     cursor: "auto",
     image: new Image(),
-    imageFile: 'RectangleShape.png',
+    imageFile: 'Images/RectangleShapeTool.png',
+    tooltip: "Draw rectangle",
     mouseDown: function()
     {
-        Canvas.selectedObject = Canvas.objects.length;
+        for (var i = 0; i < Canvas.objects.length; ++i)
+        {
+            Canvas.objects[i].selected = false;
+        }
+        Canvas.selectedObject = Canvas.objects.length;  //This is bug-prone in rare cases I think
         Canvas.objects.push(new Rectangle(Mouse.x,Mouse.y));
+        Canvas.objects[Canvas.objects.length-1].selected = true;
     },
     mouseMove: function()
     {
@@ -147,39 +333,113 @@ var rectangleShapeTool = {
     }
 }
 var rectangleSelectTool = {
+    type: "tool",
     cursor: "auto",
     image: new Image(),
-    imageFile: 'RectangleSelect.png',
+    imageFile: 'Images/RectangleSelectTool.png',
+    tooltip: "Rectangular selection",
     mouseDown: function()
     {
-
-    }
-}
-var EllipseSelectTool = {
-    cursor: "auto",
-    image: new Image(),
-    imageFile: 'EllipseSelect.png',
-    mouseDown: function()
+        if (Canvas.selections == null)
+        {
+            Canvas.selections = new Selection(Mouse.x, Mouse.y);
+        }
+        
+    },
+    mouseMove()
     {
+        if (Canvas.selections != null && Mouse.state == true)
+        {
+            Canvas.selections.x = Mouse.x;
+            Canvas.selections.y = Mouse.y;
 
+
+            //Select stuff
+            for (var i = 0; i < Canvas.objects.length; ++i)
+            {
+                
+                //If any corner of the object is within then select
+                var flag = false;
+                for (var j = 0; j < Canvas.objects[i].anchorPoints.length - 1; ++j)//No need to check the middle one    Note that a selection will only happen if a corner is selected
+                {
+
+                    if (Canvas.objects[i].anchorPoints[j].x > (Canvas.selections.x < Canvas.selections.anchor.x ? Canvas.selections.x : Canvas.selections.anchor.x)   //greater than smaller x
+                     && Canvas.objects[i].anchorPoints[j].y > (Canvas.selections.y < Canvas.selections.anchor.y ? Canvas.selections.y : Canvas.selections.anchor.y)
+                     && Canvas.objects[i].anchorPoints[j].x < (Canvas.selections.x > Canvas.selections.anchor.x ? Canvas.selections.x : Canvas.selections.anchor.x)
+                     && Canvas.objects[i].anchorPoints[j].y < (Canvas.selections.y > Canvas.selections.anchor.y ? Canvas.selections.y : Canvas.selections.anchor.y)
+                    )
+                    {
+                        Canvas.objects[i].selected = true;
+                        flag = true;
+                    }
+
+                    
+                }
+                if (flag == false)
+                {
+                    Canvas.objects[i].selected = false;
+                }
+                
+
+
+            }
+
+
+
+        }
     }
 }
 var EllipseShapeTool = {
+    type: "tool",
     cursor: "auto",
     image: new Image(),
-    imageFile: 'EllipseShape.png',
+    imageFile: 'Images/EllipseShapeTool.png',
+    tooltip: "Draw ellipse",
     mouseDown: function()
     {
+        for (var i = 0; i < Canvas.objects.length; ++i)
+        {
+            Canvas.objects[i].selected = false;
+        }
+        Canvas.selectedObject = Canvas.objects.length;  //This is bug-prone in rare cases I think
+        Canvas.objects.push(new Ellipse(Mouse.x,Mouse.y));
+        Canvas.objects[Canvas.objects.length-1].selected = true;
+    },
+    mouseMove: function()
+    {
+        if (Canvas.selectedObject!=-1 && Mouse.state == true)
+        {
+            Canvas.objects[Canvas.selectedObject].x = Mouse.x;
+            Canvas.objects[Canvas.selectedObject].y = Mouse.y;  //update func(x,y)?
 
+            Canvas.objects[Canvas.selectedObject].anchorPoints[0].x = Canvas.objects[Canvas.selectedObject].anchor.x;
+            Canvas.objects[Canvas.selectedObject].anchorPoints[0].y = Canvas.objects[Canvas.selectedObject].anchor.y;
+
+            Canvas.objects[Canvas.selectedObject].anchorPoints[1].x = Canvas.objects[Canvas.selectedObject].anchor.x;
+            Canvas.objects[Canvas.selectedObject].anchorPoints[1].y = Canvas.objects[Canvas.selectedObject].y;
+
+            Canvas.objects[Canvas.selectedObject].anchorPoints[2].x = Canvas.objects[Canvas.selectedObject].x;
+            Canvas.objects[Canvas.selectedObject].anchorPoints[2].y = Canvas.objects[Canvas.selectedObject].y;
+
+            Canvas.objects[Canvas.selectedObject].anchorPoints[3].x = Canvas.objects[Canvas.selectedObject].x;
+            Canvas.objects[Canvas.selectedObject].anchorPoints[3].y = Canvas.objects[Canvas.selectedObject].anchor.y;
+        }
     }
 }
-var PaintBucketTool = {
-    cursor: "url('PaintBucket.png'), auto",
+var PaintBucketButton = {
+    type: "button",
     image: new Image(),
-    imageFile: 'PaintBucket.png',
-    mouseDown: function()
+    imageFile: 'Images/PaintBucketButton.png',
+    tooltip: "Change color of selected objects",
+    click: function()
     {
-        //I think this is only going to work for selections or elements
+        for (var i = 0; i < Canvas.objects.length; ++i)
+        {
+            if (Canvas.objects[i].selected == true)
+            {
+                Canvas.objects[i].color = Canvas.color;
+            }
+        }
     }
 }
 
@@ -202,8 +462,8 @@ class Menu
         this.buttons = [];
         this.buttonHeight = this.width/3;
         this.buttonWidth = this.width/3;
-        this.buttonColor = "yellow" //Testing purposes only, fix
-        
+        this.selected = 0;
+
     }
     draw()
     {
@@ -213,8 +473,6 @@ class Menu
         ctx.fillRect(this.x+this.borderWidth, this.y+this.borderWidth, this.width-this.borderWidth*2, this.height-this.borderWidth*2);
         ctx.fillStyle = "lightblue";
         ctx.fillRect(this.x+this.borderWidth,this.y+this.borderWidth,this.width-this.borderWidth*2,Global.menuDragableHeight-this.borderWidth*2);
-
-        //Draw a 4 pointed arrow here for good measure and even change the cursor to go full pro
 
 
 
@@ -238,7 +496,7 @@ class Menu
     {
         //if the mouse is on the edge I can do the resize arrows but it could get messy with sizing
         //Bounds checking for when the menu is clicked
-        if (Mouse.x > this.x && Mouse.x < this.x + this.width && Mouse.y > this.y && Mouse.y < this.y + Global.menuDragableHeight)
+        if (Mouse.x > this.x && Mouse.x < this.x + this.width && Mouse.y > this.y && Mouse.y <= this.y + Global.menuDragableHeight)
         {
             //check mouse state and drag and stuff
             this.locked = false;
@@ -260,7 +518,6 @@ class Menu
 
                     this.buttonClick(i);
 
-
                  }
             }
         }
@@ -274,9 +531,16 @@ class ToolMenu extends Menu
     //Have minimise button
     buttonClick(i)
     {
-        //document.getElementById("myCanvas").style.cursor = this.buttons[i].image;
-        //Mouse.tool.cursor = this.buttons[i].cursor;
-        Mouse.tool = this.buttons[i];
+        if (this.buttons[i].type == "tool") //8 Is the delete button position
+        {
+            Mouse.tool = this.buttons[i];
+            this.selected = i;
+        }
+        if (this.buttons[i].type == "button")
+        {
+            this.buttons[i].click();
+        }
+
     }
     clicked()
     {
@@ -294,6 +558,11 @@ class ToolMenu extends Menu
         //This technically shouldn't be in the menu class and just have seperate definitions in tools and colours
         for (var i = 0; i < this.buttons.length; ++i)
         {
+            if (i == this.selected)
+            {
+            ctx.fillStyle = "white";
+            ctx.fillRect(this.x + 10 + (i%2?this.width/3+10:0), this.y + Global.menuDragableHeight+10+(this.buttonHeight+10)*(Math.floor(i/2)),this.buttonWidth,this.buttonHeight);
+            }
             this.buttons[i].image.src = this.buttons[i].imageFile;
             ctx.drawImage(this.buttons[i].image, this.x + 10 + (i%2?this.width/3+10:0), this.y + Global.menuDragableHeight+10+(this.buttonHeight+10)*(Math.floor(i/2)),this.buttonWidth,this.buttonHeight);
 
@@ -320,6 +589,16 @@ class ToolMenu extends Menu
                     
                     this.buttons[i].image.src = this.buttons[i].imageFile;
                     ctx.drawImage(this.buttons[i].image, this.x + 10 + (i%2?this.width/3+10:0), this.y + Global.menuDragableHeight+10+(this.buttonHeight+10)*(Math.floor(i/2)),this.buttonWidth,this.buttonHeight);
+
+                    //Tooltip
+                    if (Global.displayTooltips == true)
+                    {
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(Mouse.x-10, Mouse.y-20, 2.3*ctx.measureText(this.buttons[i].tooltip).width, 30);
+                        ctx.font = "20px Arial";    //make relative
+                        ctx.fillStyle = "black";
+                        ctx.fillText(this.buttons[i].tooltip, Mouse.x, Mouse.y);
+                    }
 
 
                  }
@@ -384,59 +663,37 @@ class AnchorPoint
         
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
-        ctx.fill(); 
+        ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.stroke();
     }
     click()
     {
         if (Math.pow(Mouse.x - this.x,2)+Math.pow(Mouse.y - this.y, 2) <= Math.pow(this.radius,2))
         {
             this.selected = true;
+            return true;
         }
+        return false;
     }
 }
 class Object
-{
-    
-    constructor(x,y)
-    { 
-        this.x = x;
-        this.y = y;
-        this.selected = false;
-        this.anchorPoints = [
-            new AnchorPoint(this.x,this.y), //TopLeft
-            new AnchorPoint(this.x,this.y), //TopRight
-            new AnchorPoint(this.x,this.y), //BottomRight
-            new AnchorPoint(this.x,this.y)  //BottomLeft
-        ]; //Always 4 corners
-    }
-    draw()
-    {
-        //Inheritable
-    }
-    click()
-    {
-
-    }
-    select()
-    {
-
-    }
-}
-class Rectangle //extends Object??
 {
     constructor(x,y)
     {
         this.x = x;
         this.y = y;
         this.anchor = {x: x, y: y};
-        this.color = Canvas.color
+        this.color = Canvas.color;
+        this.type;
 
         this.anchorPoints = [
             new AnchorPoint(this.x,this.y), //TopLeft
             new AnchorPoint(this.x,this.y), //TopRight
             new AnchorPoint(this.x,this.y), //BottomRight
-            new AnchorPoint(this.x,this.y)  //BottomLeft
-        ]; //Always 4 corners
+            new AnchorPoint(this.x,this.y),  //BottomLeft
+            new AnchorPoint(this.x,this.y)  //Centre
+        ]; //Always 4 corners, 1 centre
 
         this.anchorPoints[0].x = this.anchor.x;
         this.anchorPoints[0].y = this.anchor.y;
@@ -450,12 +707,22 @@ class Rectangle //extends Object??
         this.anchorPoints[3].x = this.anchor.x;
         this.anchorPoints[3].y = this.y;
 
+        this.anchorPoints[4].x = (this.anchor.x+this.x)/2;
+        this.anchorPoints[4].y = (this.anchor.y+this.y)/2;
+        
 
 
     }
+    move(x,y)
+    {
+        this.anchor.x += x;
+        this.anchor.y += y;
+
+        this.x += x;
+        this.y += y;
+    }
     draw()
     {
-
         if (this.anchorPoints[0].selected == true)
         {
             this.anchor.x = Mouse.x;
@@ -476,6 +743,23 @@ class Rectangle //extends Object??
             this.anchor.x = Mouse.x;
             this.y = Mouse.y;
         }
+        if (this.anchorPoints[4].selected == true)
+        {
+            //This moves the whole thing plus set cursor to drag I guess
+            //Since in the mousemove event, this gets called after this gets set, so it overrides
+            document.getElementById("myCanvas").style.cursor = "move";
+
+            var width = Math.abs(this.x - this.anchor.x);
+            var height = Math.abs(this.y - this.anchor.y);
+
+            this.anchor.x = Mouse.x - width/2;
+            this.anchor.y = Mouse.y - height/2;
+
+            this.x = Mouse.x + width/2;
+            this.y = Mouse.y + height/2;
+
+
+        }
 
         //Updating anchors
         this.anchorPoints[0].x = this.anchor.x;
@@ -489,6 +773,51 @@ class Rectangle //extends Object??
 
         this.anchorPoints[3].x = this.anchor.x;
         this.anchorPoints[3].y = this.y;
+
+        this.anchorPoints[4].x = (this.anchor.x+this.x)/2;
+        this.anchorPoints[4].y = (this.anchor.y+this.y)/2;
+    }
+    click()
+    {
+        if (Mouse.x > (this.anchor.x<this.x?this.anchor.x:this.x) && Mouse.x < (this.anchor.x>this.x?this.anchor.x:this.x)
+         && Mouse.y > (this.anchor.y<this.y?this.anchor.y:this.y) && Mouse.y < (this.anchor.y>this.y?this.anchor.y:this.y))
+        {
+            return true;
+        }
+        return false;
+    }
+    select()
+    {
+
+    }
+}
+class Selection
+{
+    constructor(x,y)
+    {
+        this.x = x;
+        this.y = y;
+        this.anchor = {x: x, y: y};
+    }
+    draw()
+    {
+        ctx.fillStyle = "blue";
+        ctx.globalAlpha = 0.2;
+        ctx.fillRect(this.anchor.x<this.x?this.anchor.x:this.x,this.anchor.y<this.y?this.anchor.y:this.y,Math.abs(this.x-this.anchor.x),Math.abs(this.y-this.anchor.y));
+        ctx.globalAlpha = 1;
+    }
+}
+class Rectangle extends Object
+{
+    constructor(x,y)
+    {
+        super(x,y);
+        this.type = "Rectangle";
+    }
+    draw()
+    {
+
+        super.draw();
 
         ctx.fillStyle = this.color;
         //This is to correctly draw without negative widths
@@ -504,14 +833,64 @@ class Rectangle //extends Object??
 
         
     }
-    click()
+}
+class Ellipse extends Object
+{
+    constructor(x,y)
     {
-        if (Mouse.x > (this.anchor.x<this.x?this.anchor.x:this.x) && Mouse.x < (this.anchor.x>this.x?this.anchor.x:this.x)
-         && Mouse.y > (this.anchor.y<this.y?this.anchor.y:this.y) && Mouse.y < (this.anchor.y>this.y?this.anchor.y:this.y))
+        super(x,y);
+        this.type = "Ellipse";
+    }
+    draw()
+    {
+        super.draw();
+
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.ellipse(this.anchorPoints[4].x, this.anchorPoints[4].y, Math.abs(this.anchorPoints[0].x-this.anchorPoints[1].x)/2, Math.abs(this.anchorPoints[0].y-this.anchorPoints[2].y)/2, 0, 0, 2 * Math.PI);
+        ctx.fill();
+        if (this.selected==true)
         {
-            return true;
+            for (var i = 0; i < this.anchorPoints.length; ++i)
+            {
+                this.anchorPoints[i].draw();
+            }
         }
-        return false;
+
+    }
+}
+class TextObject extends Object
+{
+    constructor(x,y)
+    {
+        super(x,y);
+        this.type = "Text";
+        this.text = "";
+        this.font;
+        this.size;
+    }
+    draw()
+    {
+        super.draw();
+
+        this.font = "Arial";
+        this.size = "30";
+
+        
+
+        
+        ctx.fillStyle = this.color;
+        ctx.font = ((this.size.toString(10)).concat("px ")).concat(this.font);
+        ctx.fillText(this.text, this.anchorPoints[0].x,this.anchorPoints[0].y);
+
+        if (this.selected==true)
+        {
+            for (var i = 0; i < this.anchorPoints.length; ++i)
+            {
+                this.anchorPoints[i].draw();
+            }
+        }
+
     }
 }
 
@@ -524,11 +903,12 @@ class CanvasRegion
         this.heightPercantage = Global.canvasHeightPercentage;
 
         this.thickness = 2;
-        this.color = "black"; //make rgb but probably not here
+        this.color = "black"; //make rgb but probably not here (transparency?)
         this.selectedObject = -1;   //Always safety check using this
 
         this.paths = [];
         this.objects = [];
+        this.selections = null; //This is going to completely abuse js types, but I guess I could do better with inheritance
 
         //Keep track of click actions that affect the canvas, we'll need them for undo redo
 
@@ -555,57 +935,19 @@ class CanvasRegion
             //rearrange the array depending on stack push to back
             this.objects[i].draw();
         }
+        if (this.selections != null)
+        {
+            this.selections.draw();
+
+        }
 
     }
 
 }
 
 
-
-
-
-
-
-//Entry point here
-var canvas = document.getElementById("myCanvas");
-var ctx = canvas.getContext("2d");
-ctx.imageSmoothingEnabled = false;  //Not working?
-
-var Canvas = new CanvasRegion();
-var tools = new ToolMenu(20,20,100,400,"lightgray",2);
-var colors = new ColorMenu(20,430,100,400,"lightgray",2);
-//These numbers are configured for my monitor, either make them dynamic or smaller OR resizable
-
-tools.buttons.push(defaultTool);
-tools.buttons.push(pencilTool);
-tools.buttons.push(rectangleShapeTool);
-tools.buttons.push(rectangleSelectTool);
-
-tools.buttons.push(EllipseShapeTool);
-tools.buttons.push(EllipseSelectTool);
-
-tools.buttons.push(PaintBucketTool);
-tools.buttons.push(ErasorTool);
-
-//Order these better
-colors.buttons.push(new ColorButton("red"));
-colors.buttons.push(new ColorButton("orange"));
-colors.buttons.push(new ColorButton("yellow"));
-colors.buttons.push(new ColorButton("green"));
-colors.buttons.push(new ColorButton("blue"));
-colors.buttons.push(new ColorButton("lightblue"));
-colors.buttons.push(new ColorButton("purple"));
-colors.buttons.push(new ColorButton("brown"));
-colors.buttons.push(new ColorButton("white"));
-colors.buttons.push(new ColorButton("black"));
-colors.buttons.push(new ColorButton("gray"));
-
-
-
-
-window.onload = function loop()
+function draw()
 {
-
     Canvas.draw();
 
     //when locking and unlocking these, change draw order
@@ -623,17 +965,70 @@ window.onload = function loop()
         tools.draw();
         tools.mouseMove();
     }
-    
-
-
-    requestAnimationFrame(loop);
 }
 
 
 
 
 
+//Entry point here  --->
+var canvas = document.getElementById("myCanvas");
+var ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;  //Not working?
+
+var Canvas = new CanvasRegion();
+var tools = new ToolMenu(20,20,100,400,"lightgray",2);
+var colors = new ColorMenu(20,430,100,400,"lightgray",2);
+//These numbers are configured for my monitor, either make them dynamic or smaller or resizable
+
+tools.buttons.push(defaultTool);
+tools.buttons.push(pencilTool);
+tools.buttons.push(rectangleShapeTool);
+tools.buttons.push(rectangleSelectTool);
+
+tools.buttons.push(EllipseShapeTool);
+
+tools.buttons.push(PaintBucketButton);
+tools.buttons.push(ErasorTool);
+tools.buttons.push(DeleteSelectedButton);//This order is important, keep track no8
+tools.buttons.push(moveSelected);
+tools.buttons.push(PushToFrontButton);
+tools.buttons.push(PushToBackButton);
+tools.buttons.push(HelpButton);
+tools.buttons.push(textTool);
+
+
+//Order these better
+colors.buttons.push(new ColorButton("red"));
+colors.buttons.push(new ColorButton("orange"));
+colors.buttons.push(new ColorButton("yellow"));
+colors.buttons.push(new ColorButton("green"));
+colors.buttons.push(new ColorButton("blue"));
+colors.buttons.push(new ColorButton("lightblue"));
+colors.buttons.push(new ColorButton("purple"));
+colors.buttons.push(new ColorButton("brown"));
+colors.buttons.push(new ColorButton("white"));
+colors.buttons.push(new ColorButton("black"));
+colors.buttons.push(new ColorButton("gray"));
+
+draw();
+
+window.addEventListener('load', (event) => {
+    draw();
+});
+//draw();
+
 //Event Listeners
+document.addEventListener('keydown', (e) => {
+  
+    if (Mouse.tool == textTool)
+    {
+
+        Mouse.tool.keydown(e.key);
+        
+    }
+    draw();
+});
 canvas.addEventListener('mousemove', e => 
 {
 
@@ -641,17 +1036,35 @@ canvas.addEventListener('mousemove', e =>
     Mouse.x = e.clientX - canvas.getBoundingClientRect().left;
     Mouse.y = e.clientY - canvas.getBoundingClientRect().top;
 
-    Mouse.tool.mouseMove();
+    if (!(
+        (Mouse.x >= tools.x && Mouse.x <= tools.x + tools.width
+     &&  Mouse.y >= tools.y && Mouse.y <= tools.y + tools.height)
+    ||
+    (Mouse.x >= colors.x && Mouse.x <= colors.x + colors.width &&
+     Mouse.y >= colors.y && Mouse.y <= colors.y + colors.height)
+    
+    ))
+    {
+        Mouse.tool.mouseMove();
+    } 
+    
+
+    draw();
 
 });
 canvas.addEventListener('mousedown', e => 
 {
+
     Mouse.state = true;
 
-    Mouse.x = e.clientX - canvas.getBoundingClientRect().left;  //If performance is a problem you can get rid of these
-    Mouse.y = e.clientY - canvas.getBoundingClientRect().top;
+    Mouse.x = e.clientX - canvas.getBoundingClientRect().left - 2;
+    Mouse.y = e.clientY - canvas.getBoundingClientRect().top - 2;
 
+    //******************************Fix this why 2?
 
+    //Check if within selection bounds, if not unselect
+    //Will have to be more advanced for freeform select, however right now it's just rectangles
+    
 
     if (Global.menuStack==-1)
     {
@@ -659,6 +1072,18 @@ canvas.addEventListener('mousedown', e =>
         {
             if (colors.clicked()==false)
             {
+                if (Canvas.selections != null)//Maybe make it check for rectangle type
+                {
+                    if (Mouse.x > (Canvas.selections.anchor.x<Canvas.selections.x?Canvas.selections.anchor.x:Canvas.selections.x) && Mouse.x < (Canvas.selections.anchor.x>Canvas.selections.x?Canvas.selections.anchor.x:Canvas.selections.x)
+                    && Mouse.y > (Canvas.selections.anchor.y<Canvas.selections.y?Canvas.selections.anchor.y:Canvas.selections.y) && Mouse.y < (Canvas.selections.anchor.y>Canvas.selections.y?Canvas.selections.anchor.y:Canvas.selections.y))
+                    {
+
+                    }
+                    else
+                    {
+                        Canvas.selections = null;
+                    }
+                }
                 Mouse.tool.mouseDown();
             }
         }
@@ -669,6 +1094,18 @@ canvas.addEventListener('mousedown', e =>
         {
             if (tools.clicked()==false)
             {
+                if (Canvas.selections != null)//Maybe make it check for rectangle type
+                {
+                    if (Mouse.x > (Canvas.selections.anchor.x<Canvas.selections.x?Canvas.selections.anchor.x:Canvas.selections.x) && Mouse.x < (Canvas.selections.anchor.x>Canvas.selections.x?Canvas.selections.anchor.x:Canvas.selections.x)
+                    && Mouse.y > (Canvas.selections.anchor.y<Canvas.selections.y?Canvas.selections.anchor.y:Canvas.selections.y) && Mouse.y < (Canvas.selections.anchor.y>Canvas.selections.y?Canvas.selections.anchor.y:Canvas.selections.y))
+                    {
+
+                    }
+                    else
+                    {
+                        Canvas.selections = null;
+                    }
+                }
                 Mouse.tool.mouseDown();
             }
         }
@@ -676,17 +1113,19 @@ canvas.addEventListener('mousedown', e =>
 
 
     
-    
-    
-    
-
-
     document.getElementById("myCanvas").style.cursor = Mouse.tool.cursor;
+    
+    draw();
+
+
+    
 
 });
 canvas.addEventListener('mouseup', e => 
 {
     Mouse.state = false;
+
+    Canvas.selections = null;
 
     tools.locked = true;
     colors.locked = true;
@@ -703,8 +1142,12 @@ canvas.addEventListener('mouseup', e =>
         }
     }
 
+    
+    
 
     document.getElementById("myCanvas").style.cursor = Mouse.tool.cursor;
+
+    draw();
 
 });
 
