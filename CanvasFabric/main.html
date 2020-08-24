@@ -1,0 +1,188 @@
+<html>
+
+<head>
+<title>Drawing</title>
+<style>
+canvas
+{
+    border-style: solid;
+}
+</style>
+</head>
+
+
+			
+<link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-js/1.4.0/css/fabric.min.css" />
+<link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-js/1.4.0/css/fabric.components.min.css" />
+<script src="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-js/1.4.0/js/fabric.min.js"></script>
+
+		
+
+
+<body>
+<button class="ms-Button">
+    <span class="Button-label">Select</span> 
+</button>
+<button class="ms-Button">
+    <span class="Button-label">Rectangle</span> 
+</button>
+<button class="ms-Button">
+    <span class="Button-label">Ellipse</span> 
+</button>   
+<button class="ms-Button">
+    <span class="Button-label">Free Draw</span> 
+</button>   
+<button class="ms-Button">
+    <span class="Button-label">Delete</span> 
+</button>  
+<input type="color" value="#ff0000">
+<canvas id="myCanvas" width="600" height="500"></canvas>
+
+
+
+<script src="fabric.js"></script>
+<script>
+
+
+var canvas = new fabric.Canvas('myCanvas', {
+                isDrawingMode: false
+});
+
+
+
+
+
+
+var objects = [];
+
+   
+
+
+
+
+
+var Mouse = {
+    x: 0,
+    y: 0,
+    tool: "default",
+    state: false    //true is clicking, false is not
+}
+var Global = {
+    color: "red"
+}
+
+
+function rectangle(x,y)
+{
+    objects.push(new fabric.Rect({
+    left: x - 20,
+    top: y - 20,
+    fill: Global.color,
+    width: 40,
+    angle: 0,
+    height: 40
+    }));
+
+    canvas.add(objects[objects.length-1]);
+}
+function ellipse(x,y)
+{
+    objects.push(new fabric.Circle({
+    left: x - 20,
+    top: y - 20,
+    fill: Global.color,
+    radius: 20
+    }));
+
+    canvas.add(objects[objects.length-1]);
+}    
+
+function create(type)
+{
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    switch(type)
+    {
+        case "default":
+            canvas.selection = true;
+        break;
+        case "rectangle":
+            rectangle(Mouse.x,Mouse.y);
+        break;
+        case "ellipse":
+            ellipse(Mouse.x,Mouse.y);
+        break;
+        case "freeDraw":
+            canvas.isDrawingMode = true;
+        break;
+        case "delete":
+            console.log(canvas.getActiveObject());
+            canvas.requestRenderAll();
+        break;
+    }
+}
+
+var ButtonElements = document.querySelectorAll(".ms-Button");
+
+new fabric['Button'](ButtonElements[0], function() {
+    Mouse.tool = "default";
+    canvas.selection = true;
+    canvas.isDrawingMode = false;
+});
+new fabric['Button'](ButtonElements[1], function() {
+      Mouse.tool = "rectangle";
+});
+new fabric['Button'](ButtonElements[2], function() {
+      Mouse.tool = "ellipse";
+});
+new fabric['Button'](ButtonElements[3], function() {
+    Mouse.tool = "freeDraw";
+    canvas.selection = false;
+    canvas.isDrawingMode = true;
+});
+new fabric['Button'](ButtonElements[4], function() {
+    Mouse.tool = "delete";
+    canvas.getActiveObjects().forEach((obj) => {
+    canvas.remove(obj)
+    });
+    canvas.discardActiveObject().renderAll();
+      
+});
+
+
+
+canvas.on('mouse:down', function(options) {
+  
+    Mouse.state = true;
+
+    create(Mouse.tool);
+    
+});
+canvas.on('mouse:up', function(options) {
+    
+    Mouse.state = false;
+
+
+
+});
+canvas.on('mouse:move', function(options) {
+  
+    Mouse.x = options.e.layerX;
+    Mouse.y = options.e.layerY;
+
+    
+
+});
+document.addEventListener("change", watchColorPicker, false);
+
+function watchColorPicker(event) {
+    Global.color = event.target.value;
+    canvas.getActiveObjects().forEach((obj) => {
+    obj.fill = Global.color;
+    });
+    canvas.discardActiveObject().renderAll();
+}
+</script>
+
+</body>
+</html>
