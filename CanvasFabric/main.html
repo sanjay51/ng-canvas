@@ -27,14 +27,17 @@ canvas
     <span class="Button-label">Rectangle</span> 
 </button>
 <button class="ms-Button">
-    <span class="Button-label">Ellipse</span> 
+    <span class="Button-label">Circle</span> 
 </button>
 <button class="ms-Button">
     <span class="Button-label">Line</span> 
 </button>
 <button class="ms-Button">
     <span class="Button-label">Triangle</span> 
-</button>           
+</button>
+<button class="ms-Button">
+    <span class="Button-label">Text</span> 
+</button>            
 <button class="ms-Button">
     <span class="Button-label">Free Draw</span> 
 </button>   
@@ -62,6 +65,8 @@ var canvas = new fabric.Canvas('myCanvas', {
 
 canvas.setDimensions({width:window.innerWidth*0.9, height:window.innerHeight*0.8});
 
+//flowchart?
+//text option
 
 var Mouse = {
     x: 0,
@@ -72,59 +77,123 @@ var Mouse = {
 var Global = {
     color: "black",
     creating: false, //flag for object creation
-    anchor: {x:0,y:0}
+    anchor: {x:0,y:0},
+    selectedObjectCreate: null
 }
 var state = []; //Saves
 state.push(canvas.toDatalessJSON());
 
 function rectangle(x,y)
 {
-    canvas.add(new fabric.Rect({
-    left: x - 20,
-    top: y - 20,
-    fill: Global.color,
-    width: 40,
-    angle: 0,
-    height: 40
-    }));
-}
-function ellipse(x,y)
-{
-    canvas.add(new fabric.Circle({
-    left: x - 20,
-    top: y - 20,
-    fill: Global.color,
-    radius: 20
-    }));
-}
-function line(x, y)
-{
-    if (!Global.creating)
+
+    if (Global.selectedObjectCreate == null)
     {
-        Global.creating = true;
         Global.anchor.x = x;
         Global.anchor.y = y;
+        Global.selectedObjectCreate = new fabric.Rect({
+        left: x,
+        top: y,
+        fill: Global.color,
+        width: 0,
+        angle: 0,
+        height: 0,
+        objectCaching: false
+        });
+        canvas.add(Global.selectedObjectCreate);
     }
     else
     {
-        Global.creating = false;
-        canvas.add(new fabric.Line([x, y, Global.anchor.x, Global.anchor.y],{
-        strokeWidth: 2,
-        stroke: Global.color
-    }));
+        Global.selectedObjectCreate.set({"width": x - Global.anchor.x, "height": y - Global.anchor.y});
+        canvas.renderAll();
+        Global.selectedObjectCreate.setCoords();
     }
+
+
+
+}
+function ellipse(x,y)
+{
+    if (Global.selectedObjectCreate == null)
+    {
+        Global.anchor.x = x;
+        Global.anchor.y = y;
+        Global.selectedObjectCreate = new fabric.Circle({
+        left: x,
+        top: y,
+        originX: "center",
+        originY: "center",
+        fill: Global.color,
+        radius: 0,
+        objectCaching: false
+        });
+        canvas.add(Global.selectedObjectCreate);
+    }
+    else
+    {
+        Global.selectedObjectCreate.set({"top":y,"left":x,"radius": Math.abs(x-Global.anchor.x)});
+        canvas.renderAll();
+        Global.selectedObjectCreate.setCoords();
+    }
+}
+function line(x, y)
+{
+
+    if (Global.selectedObjectCreate == null)
+    {
+        Global.anchor.x = x;
+        Global.anchor.y = y;
+        Global.selectedObjectCreate = new fabric.Line([x, y, Global.anchor.x, Global.anchor.y],{
+        strokeWidth: 2,
+        stroke: Global.color,
+        objectCaching: false
+    });
+    canvas.add(Global.selectedObjectCreate);
+    }
+    else
+    {
+        Global.selectedObjectCreate.set({"y2":y,"x2":x});
+        canvas.renderAll();
+        Global.selectedObjectCreate.setCoords();
+    }
+
+    
     
 }
 function triangle(x,y)
 {
-    canvas.add(new fabric.Triangle({
-    left: x-20,
-    top: y-20,
-    fill: Global.color,
-    width: 40,
-    height: 40
-    }));
+    if (Global.selectedObjectCreate == null)
+    {
+        Global.anchor.x = x;
+        Global.anchor.y = y;
+        Global.selectedObjectCreate = new fabric.Triangle({
+        left: x,
+        top: y,
+        fill: Global.color,
+        width: 0,
+        height: 0,
+        objectCaching: false
+        });
+        canvas.add(Global.selectedObjectCreate);
+    }
+    else
+    {
+        Global.selectedObjectCreate.set({"width": x - Global.anchor.x, "height": y - Global.anchor.y});
+        canvas.renderAll();
+        Global.selectedObjectCreate.setCoords();
+    }
     
+}
+function text(x, y)
+{
+
+    Global.selectedObjectCreate = new fabric.Text('Text', { 
+    fontFamily: 'Delicious_500', 
+    left: x, 
+    top: y 
+    });
+    canvas.ActiveSelection
+    canvas.add(Global.selectedObjectCreate);
+
 }
 
 function create(type)
@@ -147,6 +216,9 @@ function create(type)
         break;
         case "triangle":
             triangle(Mouse.x,Mouse.y);
+        break;
+        case "text":
+            text(Mouse.x,Mouse.y);
         break;
         case "freeDraw":
             canvas.isDrawingMode = true;
@@ -178,11 +250,14 @@ new fabric['Button'](ButtonElements[4], function() {
       Mouse.tool = "triangle";
 });
 new fabric['Button'](ButtonElements[5], function() {
+      Mouse.tool = "text";
+});
+new fabric['Button'](ButtonElements[6], function() {
     Mouse.tool = "freeDraw";
     canvas.selection = false;
     canvas.isDrawingMode = true;
 });
-new fabric['Button'](ButtonElements[6], function() {
+new fabric['Button'](ButtonElements[7], function() {
     Mouse.tool = "delete";
     canvas.getActiveObjects().forEach((obj) => {
     canvas.remove(obj)
@@ -190,34 +265,38 @@ new fabric['Button'](ButtonElements[6], function() {
     canvas.discardActiveObject().renderAll();
       
 });
-new fabric['Button'](ButtonElements[7], function() {
+new fabric['Button'](ButtonElements[8], function() {
     Mouse.tool = "changeColor";
     canvas.getActiveObjects().forEach((obj) => {
     obj.fill = Global.color;
     });
+    if (canvas.getActiveObject()!= null)
+        canvas.getActiveObject().set("fill", Global.color);
+    
     canvas.discardActiveObject().renderAll();
       
 });
-new fabric['Button'](ButtonElements[8], function() {
+new fabric['Button'](ButtonElements[9], function() {
     //Undo
     canvas.loadFromJSON(state[state.length-2], function()
     {
         state.pop();
     })
 });
-/*
-new fabric['Button'](ButtonElements[9], function() {
-    //Redo
-    state[0] = canvas.toDatalessJSON();
-});
-*/
-
 
 canvas.on('mouse:down', function(options) {
   
     Mouse.state = true;
-
-    create(Mouse.tool);
+    if (canvas.getActiveObject() == null)
+    {
+        Global.creating = true;
+        create(Mouse.tool);
+    }
+    else
+    {
+        Mouse.tool = "default";
+    }
+    
 
     state.push(canvas.toDatalessJSON());
     
@@ -225,16 +304,34 @@ canvas.on('mouse:down', function(options) {
 canvas.on('mouse:up', function(options) {
     
     Mouse.state = false;
-
-
+    Global.selectedObjectCreate = null;
 });
 canvas.on('mouse:move', function(options) {
   
     Mouse.x = options.e.layerX;
     Mouse.y = options.e.layerY;
-
-    
-
+    if (Mouse.state == true)
+    {
+        if (Global.selectedObjectCreate != null)
+        {
+            if (Mouse.tool == "line")
+            {
+                line(Mouse.x, Mouse.y);
+            }
+            if (Mouse.tool == "rectangle")
+            {
+                rectangle(Mouse.x, Mouse.y);
+            }
+            if (Mouse.tool == "ellipse")
+            {
+                ellipse(Mouse.x, Mouse.y);
+            }
+            if (Mouse.tool == "triangle")
+            {
+                triangle(Mouse.x, Mouse.y);
+            }
+        }        
+    }
 });
 document.addEventListener("change", watchColorPicker, false);
 document.addEventListener("input", watchColorPicker, false);
@@ -244,9 +341,35 @@ function watchColorPicker(event) {
     obj.fill = Global.color;
     obj.stroke = Global.color;
     });
-    canvas.getActiveObjects().renderAll();
+    canvas.requestRenderAll();
     
 }
+document.addEventListener('keydown', function(event) { 
+            const key = event.key; 
+            if (key === "Delete") { 
+                canvas.getActiveObjects().forEach((obj) => {
+                canvas.remove(obj)
+                });
+                canvas.discardActiveObject().renderAll();
+            } 
+            else
+            {
+                if (canvas.getActiveObject() != null)
+                {
+                    if (key == "Backspace")
+                    {
+                        canvas.getActiveObject().text = "";
+                        canvas.requestRenderAll();
+                    }
+                    else
+                    {
+                        canvas.getActiveObject().text += key;
+                        canvas.requestRenderAll();
+                    }
+                }
+            }
+
+        }); 
 </script>
 
 </body>
