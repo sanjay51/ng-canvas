@@ -30,14 +30,23 @@ canvas
     <span class="Button-label">Circle</span> 
 </button>
 <button class="ms-Button">
+    <span class="Button-label">Ellipse</span> 
+</button>
+<button class="ms-Button">
     <span class="Button-label">Line</span> 
+</button>
+<button class="ms-Button">
+    <span class="Button-label">Arrow</span> 
 </button>
 <button class="ms-Button">
     <span class="Button-label">Triangle</span> 
 </button>
 <button class="ms-Button">
     <span class="Button-label">Text</span> 
-</button>            
+</button>
+<button class="ms-Button">
+    <span class="Button-label">Text Box</span> 
+</button>          
 <button class="ms-Button">
     <span class="Button-label">Free Draw</span> 
 </button>   
@@ -50,10 +59,48 @@ canvas
 <button class="ms-Button">
     <span class="Button-label">Undo</span> 
 </button>
+<button class="ms-Button">
+    <span class="Button-label">Export JSON</span> 
+</button>
 <input type="color" value="#000000">
+<select id="input-font" class="input"
+        onchange="Global.font = (this.value);"> 
+  
+        <option value='Times New Roman' selected="selected">Times New Roman</option> 
+        <option value='Arial'>Arial</option> 
+        <option value='Helvetica'>Helvetica</option> 
+        <option value='Calibri'>Calibri</option> 
+        <option value='Times'>Times</option> 
+        <option value='Courier New'>Courier New</option> 
+        <option value='Verdana'>Verdana</option> 
+        <option value='Courier'>Courier</option> 
+        <option value='Arial Narrow'>Arial Narrow</option> 
+        <option value='Candara'>Candara</option> 
+        <option value='Geneva'>Geneva</option> 
+        <option value='Cambria'>Cambria</option> 
+</select>
+<select id="input-font" class="input"
+        onchange="Global.fontSize = parseInt((this.value), 10);"> 
+  
+        <option value='2'>2</option> 
+        <option value='4'>4</option> 
+        <option value='8'>8</option> 
+        <option value='20'>20</option> 
+        <option value='35'>35</option> 
+        <option value='50'selected="selected">50</option> 
+        <option value='65'>65</option> 
+        <option value='80'>80</option> 
+        <option value='100'>100</option> 
+        <option value='130'>130</option> 
+        <option value='160'>160</option> 
+        <option value='200'>200</option> 
+</select>
+<button class="ms-Button">
+    <span class="Button-label">Toggle Outline</span> 
+</button>
 <canvas id="myCanvas" width="600" height="500"></canvas>
 
-
+  
 
 <script src="fabric.js"></script>
 <script>
@@ -65,8 +112,7 @@ var canvas = new fabric.Canvas('myCanvas', {
 
 canvas.setDimensions({width:window.innerWidth*0.9, height:window.innerHeight*0.8});
 
-//flowchart?
-//text option
+
 
 var Mouse = {
     x: 0,
@@ -75,14 +121,115 @@ var Mouse = {
     state: false    //true is clicking, false is not
 }
 var Global = {
-    color: "black",
+    color: "#000000",
     creating: false, //flag for object creation
     anchor: {x:0,y:0},
-    selectedObjectCreate: null
+    selectedObjectCreate: null,
+    arrowLeft: null,
+    arrowRight: null,
+    fontSize: 50,
+    outline: false,
+    font: 'Times New Roman',
+    cntr: false,
+    c: false,
+    v: false
 }
 var state = []; //Saves
 state.push(canvas.toDatalessJSON());
 
+function hexToComplimentary(hex){
+
+var rgb = 'rgb(' + (hex = hex.replace('#', '')).match(new RegExp('(.{' + hex.length/3 + '})', 'g')).map(function(l) { return parseInt(hex.length%2 ? l+l : l, 16); }).join(',') + ')';
+
+rgb = rgb.replace(/[^\d,]/g, '').split(',');
+
+var r = rgb[0], g = rgb[1], b = rgb[2];
+
+r /= 255.0;
+g /= 255.0;
+b /= 255.0;
+var max = Math.max(r, g, b);
+var min = Math.min(r, g, b);
+var h, s, l = (max + min) / 2.0;
+
+if(max == min) {
+    h = s = 0;
+} else {
+    var d = max - min;
+    s = (l > 0.5 ? d / (2.0 - max - min) : d / (max + min));
+
+    if(max == r && g >= b) {
+        h = 1.0472 * (g - b) / d ;
+    } else if(max == r && g < b) {
+        h = 1.0472 * (g - b) / d + 6.2832;
+    } else if(max == g) {
+        h = 1.0472 * (b - r) / d + 2.0944;
+    } else if(max == b) {
+        h = 1.0472 * (r - g) / d + 4.1888;
+    }
+}
+
+h = h / 6.2832 * 360.0 + 0;
+
+h+= 180;
+if (h > 360) { h -= 360; }
+h /= 360;
+
+if(s === 0){
+    r = g = b = l;
+} else {
+    var hue2rgb = function hue2rgb(p, q, t){
+        if(t < 0) t += 1;
+        if(t > 1) t -= 1;
+        if(t < 1/6) return p + (q - p) * 6 * t;
+        if(t < 1/2) return q;
+        if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+    };
+
+    var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    var p = 2 * l - q;
+
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+}
+
+r = Math.round(r * 255);
+g = Math.round(g * 255); 
+b = Math.round(b * 255);
+
+rgb = b | (g << 8) | (r << 16); 
+return "#" + (0x1000000 | rgb).toString(16).substring(1);
+}  
+function copy() {
+	canvas.getActiveObject().clone(function(cloned) {
+		_clipboard = cloned;
+	});
+}
+function paste() {
+	_clipboard.clone(function(clonedObj) {
+		canvas.discardActiveObject();
+		clonedObj.set({
+			left: clonedObj.left + 10,
+			top: clonedObj.top + 10,
+			evented: true,
+		});
+		if (clonedObj.type === 'activeSelection') {
+			clonedObj.canvas = canvas;
+			clonedObj.forEachObject(function(obj) {
+				canvas.add(obj);
+			});
+			clonedObj.setCoords();
+		} else {
+			canvas.add(clonedObj);
+		}
+		_clipboard.top += 10;
+		_clipboard.left += 10;
+		canvas.setActiveObject(clonedObj);
+		canvas.requestRenderAll();
+	});
+}
 function rectangle(x,y)
 {
 
@@ -93,11 +240,14 @@ function rectangle(x,y)
         Global.selectedObjectCreate = new fabric.Rect({
         left: x,
         top: y,
-        fill: Global.color,
+        fill: Global.outline?'transparent':Global.color,
+        stroke: Global.color,
+        strokeWidth: Global.fontSize/5,
         width: 0,
         angle: 0,
         height: 0,
-        objectCaching: false
+        objectCaching: false,
+        name: 'rectangle'
         });
         canvas.add(Global.selectedObjectCreate);
     }
@@ -111,7 +261,7 @@ function rectangle(x,y)
 
 
 }
-function ellipse(x,y)
+function circle(x, y)
 {
     if (Global.selectedObjectCreate == null)
     {
@@ -122,15 +272,44 @@ function ellipse(x,y)
         top: y,
         originX: "center",
         originY: "center",
-        fill: Global.color,
+        fill: Global.outline?'transparent':Global.color,
+        stroke: Global.color,
         radius: 0,
-        objectCaching: false
+        objectCaching: false,
+        name: 'circle'
         });
         canvas.add(Global.selectedObjectCreate);
     }
     else
     {
-        Global.selectedObjectCreate.set({"top":y,"left":x,"radius": Math.abs(x-Global.anchor.x)});
+        Global.selectedObjectCreate.set({"top":Global.anchor.y,"left":Global.anchor.x,"radius": Math.abs(x-Global.anchor.x)});
+        canvas.renderAll();
+        Global.selectedObjectCreate.setCoords();
+    }
+}
+function ellipse(x,y)
+{
+    if (Global.selectedObjectCreate == null)
+    {
+        Global.anchor.x = x;
+        Global.anchor.y = y;
+        Global.selectedObjectCreate = new fabric.Ellipse({
+        left: x,
+        top: y,
+        originX: "center",
+        originY: "center",
+        fill: Global.outline?'transparent':Global.color,
+        stroke: Global.color,
+        rx: 0,
+        ry: 0,
+        objectCaching: false,
+        name: 'ellipse'
+        });
+        canvas.add(Global.selectedObjectCreate);
+    }
+    else
+    {
+        Global.selectedObjectCreate.set({"top":Global.anchor.y,"left":Global.anchor.x,"rx": Math.abs(x-Global.anchor.x),"ry": Math.abs(y-Global.anchor.y)});
         canvas.renderAll();
         Global.selectedObjectCreate.setCoords();
     }
@@ -143,9 +322,10 @@ function line(x, y)
         Global.anchor.x = x;
         Global.anchor.y = y;
         Global.selectedObjectCreate = new fabric.Line([x, y, Global.anchor.x, Global.anchor.y],{
-        strokeWidth: 2,
+        strokeWidth: Global.fontSize/10,
         stroke: Global.color,
-        objectCaching: false
+        objectCaching: false,
+        name: 'line',
     });
     canvas.add(Global.selectedObjectCreate);
     }
@@ -159,6 +339,54 @@ function line(x, y)
     
     
 }
+function arrow(x, y)
+{
+
+    if (Global.selectedObjectCreate == null)
+    {
+        Global.anchor.x = x;
+        Global.anchor.y = y;
+        Global.selectedObjectCreate = new fabric.Line([x, y, Global.anchor.x, Global.anchor.y],{
+        strokeWidth: Global.fontSize/10,
+        stroke: Global.color,
+        objectCaching: false
+    });
+    Global.arrowLeft = new fabric.Line([x, y, Global.anchor.x, Global.anchor.y],{
+        strokeWidth: Global.fontSize/10,
+        stroke: Global.color,
+        objectCaching: false
+    });
+    Global.arrowRight = new fabric.Line([x, y, Global.anchor.x, Global.anchor.y],{
+        strokeWidth: Global.fontSize/10,
+        stroke: Global.color,
+        objectCaching: false
+    });
+    canvas.add(Global.selectedObjectCreate);
+    canvas.add(Global.arrowLeft);
+    canvas.add(Global.arrowRight);    
+    }
+    else
+    {
+
+        var length = Math.sqrt(Math.pow(x-Global.anchor.x,2)+Math.pow(y-Global.anchor.y,2));
+        var theta = Math.atan((y-Global.anchor.y)/(x-Global.anchor.x));
+        var headRatio = 0.3;
+        Global.selectedObjectCreate.set({"y2":y,"x2":x});
+        Global.arrowLeft.set({  "y1":y,
+                                "x1":x,
+                                "y2":y+headRatio*length*((x-Global.anchor.x)>0?(-Math.sin(Math.PI-theta-Math.PI/6)):(Math.sin(Math.PI-theta-Math.PI/6))),
+                                "x2":x+headRatio*length*((x-Global.anchor.x)>0?(Math.cos(Math.PI-theta-Math.PI/6)):(-Math.cos(Math.PI-theta-Math.PI/6))),
+        });
+        Global.arrowRight.set({ "y1":y,
+                                "x1":x,
+                                "y2":y+headRatio*length*((x-Global.anchor.x)>0?(-Math.sin(Math.PI-theta+Math.PI/6)):(Math.sin(Math.PI-theta+Math.PI/6))),
+                                "x2":x+headRatio*length*((x-Global.anchor.x)>0?(Math.cos(Math.PI-theta+Math.PI/6)):(-Math.cos(Math.PI-theta+Math.PI/6))),
+        });
+        canvas.renderAll();
+        Global.selectedObjectCreate.setCoords();
+    }
+
+}
 function triangle(x,y)
 {
     if (Global.selectedObjectCreate == null)
@@ -168,10 +396,12 @@ function triangle(x,y)
         Global.selectedObjectCreate = new fabric.Triangle({
         left: x,
         top: y,
-        fill: Global.color,
+        fill: Global.outline?'transparent':Global.color,
+        stroke: Global.color,
         width: 0,
         height: 0,
-        objectCaching: false
+        objectCaching: false,
+        name: "triangle"
         });
         canvas.add(Global.selectedObjectCreate);
     }
@@ -185,17 +415,18 @@ function triangle(x,y)
 }
 function text(x, y)
 {
-
-    Global.selectedObjectCreate = new fabric.Text('Text', { 
-    fontFamily: 'Delicious_500', 
+    Global.selectedObjectCreate = new fabric.Text('Text',{ 
+    fontFamily: Global.font,
+    fontSize: Global.fontSize,
+    fill: Global.outline?'transparent':Global.color,
+    stroke: Global.color,
     left: x, 
-    top: y 
+    top: y,
+    objectCaching: false,
+    name: 'text'
     });
-    canvas.ActiveSelection
     canvas.add(Global.selectedObjectCreate);
-
 }
-
 function create(type)
 {
     canvas.isDrawingMode = false;
@@ -208,11 +439,17 @@ function create(type)
         case "rectangle":
             rectangle(Mouse.x,Mouse.y);
         break;
+        case "circle":
+            circle(Mouse.x, Mouse.y);
+        break;
         case "ellipse":
             ellipse(Mouse.x,Mouse.y);
         break;
         case "line":
             line(Mouse.x,Mouse.y);
+        break;
+        case "arrow":
+            arrow(Mouse.x,Mouse.y);
         break;
         case "triangle":
             triangle(Mouse.x,Mouse.y);
@@ -241,23 +478,32 @@ new fabric['Button'](ButtonElements[1], function() {
       Mouse.tool = "rectangle";
 });
 new fabric['Button'](ButtonElements[2], function() {
-      Mouse.tool = "ellipse";
+      Mouse.tool = "circle";
 });
 new fabric['Button'](ButtonElements[3], function() {
-      Mouse.tool = "line";
+      Mouse.tool = "ellipse";
 });
 new fabric['Button'](ButtonElements[4], function() {
-      Mouse.tool = "triangle";
+      Mouse.tool = "line";
 });
 new fabric['Button'](ButtonElements[5], function() {
-      Mouse.tool = "text";
+      Mouse.tool = "arrow";
 });
 new fabric['Button'](ButtonElements[6], function() {
+      Mouse.tool = "triangle";
+});
+new fabric['Button'](ButtonElements[7], function() {
+      Mouse.tool = "text";
+});
+new fabric['Button'](ButtonElements[8], function() {
+      Mouse.tool = "textBox";
+});
+new fabric['Button'](ButtonElements[9], function() {
     Mouse.tool = "freeDraw";
     canvas.selection = false;
     canvas.isDrawingMode = true;
 });
-new fabric['Button'](ButtonElements[7], function() {
+new fabric['Button'](ButtonElements[10], function() {
     Mouse.tool = "delete";
     canvas.getActiveObjects().forEach((obj) => {
     canvas.remove(obj)
@@ -265,27 +511,37 @@ new fabric['Button'](ButtonElements[7], function() {
     canvas.discardActiveObject().renderAll();
       
 });
-new fabric['Button'](ButtonElements[8], function() {
+new fabric['Button'](ButtonElements[11], function() {
     Mouse.tool = "changeColor";
     canvas.getActiveObjects().forEach((obj) => {
     obj.fill = Global.color;
+    obj.stroke = Global.color;
     });
     if (canvas.getActiveObject()!= null)
-        canvas.getActiveObject().set("fill", Global.color);
+        canvas.getActiveObject().set({
+            "fill": Global.color,
+            "stroke": Global.color
+            });
     
     canvas.discardActiveObject().renderAll();
       
 });
-new fabric['Button'](ButtonElements[9], function() {
+new fabric['Button'](ButtonElements[12], function() {
     //Undo
     canvas.loadFromJSON(state[state.length-2], function()
     {
         state.pop();
-    })
+    });
 });
-
+new fabric['Button'](ButtonElements[13], function() {
+    //JSON export
+    console.log(JSON.stringify(canvas));
+});
+new fabric['Button'](ButtonElements[14], function() {
+    Global.outline = !Global.outline;
+});
 canvas.on('mouse:down', function(options) {
-  
+    
     Mouse.state = true;
     if (canvas.getActiveObject() == null)
     {
@@ -294,17 +550,47 @@ canvas.on('mouse:down', function(options) {
     }
     else
     {
-        Mouse.tool = "default";
+        canvas.getActiveObject().lockMovementX = false;
+        canvas.getActiveObject().lockMovementY = false;
+        if ((canvas.getActiveObject().name != Mouse.tool) && Mouse.tool != "default")
+        {
+            canvas.getActiveObject().lockMovementX = true;
+            canvas.getActiveObject().lockMovementY = true;
+            canvas.discardActiveObject().renderAll();
+            create(Mouse.tool);
+            
+            
+        }
+
+        else
+        {
+            Mouse.tool = "default";
+        }
     }
     
 
-    state.push(canvas.toDatalessJSON());
+    
     
 });
 canvas.on('mouse:up', function(options) {
     
     Mouse.state = false;
+    if (Global.arrowLeft != null)
+    {
+        canvas.add(new fabric.Group(
+            [Global.selectedObjectCreate,Global.arrowLeft,Global.arrowRight],
+            {
+                name: 'arrow'
+            }
+        ));
+        canvas.remove(Global.selectedObjectCreate);
+        canvas.remove(Global.arrowLeft);
+        canvas.remove(Global.arrowRight);
+    }
     Global.selectedObjectCreate = null;
+    Global.arrowLeft = null;
+    Global.arrowRight = null;
+    state.push(canvas.toDatalessJSON());
 });
 canvas.on('mouse:move', function(options) {
   
@@ -318,9 +604,17 @@ canvas.on('mouse:move', function(options) {
             {
                 line(Mouse.x, Mouse.y);
             }
+            if (Mouse.tool == "arrow")
+            {
+                arrow(Mouse.x, Mouse.y);
+            }
             if (Mouse.tool == "rectangle")
             {
                 rectangle(Mouse.x, Mouse.y);
+            }
+            if (Mouse.tool == "circle")
+            {
+                circle(Mouse.x, Mouse.y);
             }
             if (Mouse.tool == "ellipse")
             {
@@ -344,32 +638,172 @@ function watchColorPicker(event) {
     canvas.requestRenderAll();
     
 }
+
+
 document.addEventListener('keydown', function(event) { 
             const key = event.key; 
-            if (key === "Delete") { 
-                canvas.getActiveObjects().forEach((obj) => {
-                canvas.remove(obj)
-                });
-                canvas.discardActiveObject().renderAll();
-            } 
-            else
+            if (key == "Control")
             {
-                if (canvas.getActiveObject() != null)
+                Global.cntr = true;
+            }
+            if (Global.cntr == true && key == "v")
+            {
+                if (typeof _clipboard != "undefined")
                 {
-                    if (key == "Backspace")
-                    {
-                        canvas.getActiveObject().text = "";
-                        canvas.requestRenderAll();
-                    }
-                    else
-                    {
-                        canvas.getActiveObject().text += key;
-                        canvas.requestRenderAll();
-                    }
+                    paste();
+                    state.push(canvas.toDatalessJSON());
                 }
             }
+            if (canvas.getActiveObject() != null)
+            {
+                if (Global.cntr == true && key == "c")
+                {
+                    copy();
+                }
+                for (var i = 0; i < canvas.getActiveObjects().length; ++i)
+                {
+                    switch(key)
+                    {
+                        case "Backspace":
+                        if (canvas.getActiveObjects()[i].name == "textGroup")
+                        {
+                            canvas.getActiveObjects()[i].item(1).text = "";
+                        }
+                        else
+                        {   
+                            canvas.getActiveObjects()[i].text = "";
+                            canvas.requestRenderAll();
+                            state.push(canvas.toDatalessJSON());
+                        }
+                        break;
+                        case "Delete":
+                        canvas.getActiveObjects().forEach((obj) => {
+                        canvas.remove(obj)
+                        });
+                        canvas.discardActiveObject().renderAll();
+                        state.push(canvas.toDatalessJSON());
+                        break;
+                        case "Shift": break;
+                        case "Alt": break;
+                        case "Escape": break;
+                        case "Tab": break;
+                        case "CapsLock": break;
+                        case "Control": break;
+                        case "OS": break;
+                        case "ContextMenu": break;
+                        case "Insert": break;
+                        case "Home": break;
+                        case "End": break;
+                        case "PageUp": break;
+                        case "PageDown": break;
+                        case "Pause": break;
+                        case "ScrollLock": break;
+                        case "NumLock": break;
+                        case "ArrowDown": break;
+                        case "ArrowUp": break;
+                        case "ArrowRight": break;
+                        case "ArrowLeft": break;
+                        case "F1": break;
+                        case "F2": break;
+                        case "F3": break;
+                        case "F4": break;
+                        case "F5": break;
+                        case "F6": break;
+                        case "F7": break;
+                        case "F8": break;
+                        case "F9": break;
+                        case "F10": break;
+                        case "F11": break;
+                        case "F12": break;
+                        default:
+                        canvas.getActiveObjects()[i].text += key;
+                        
+                        
+                        //if not a textGroup
+                        if (canvas.getActiveObjects()[i].name != "textGroup")
+                        {
+                            if (canvas.getActiveObjects()[i].name == "rectangle")
+                            {
+                                var group = new fabric.Group([canvas.getActiveObjects()[i],
+                                new fabric.Text(key, {
+                                fontSize: Global.fontSize,
+                                fontFamily: Global.font,
+                                originX: 'center',
+                                originY: 'center',
+                                fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
+                                left: canvas.getActiveObjects()[i].left + canvas.getActiveObjects()[i].width/2,
+                                top : canvas.getActiveObjects()[i].top + canvas.getActiveObjects()[i].height/2
+                                })],
+                                {
+                                    name: "textGroup"
+                                });
+                                canvas.add(group);
+                                canvas.remove(canvas.getActiveObjects()[i]);
+                                canvas.setActiveObject(group);
+                            }
+                            else if (canvas.getActiveObjects()[i].name == "triangle")
+                            {
+                                var group = new fabric.Group([canvas.getActiveObjects()[i],
+                                new fabric.Text(key, {
+                                fontSize: Global.fontSize,
+                                fontFamily: Global.font,
+                                originX: 'center',
+                                originY: 'center',
+                                fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
+                                left: canvas.getActiveObjects()[i].left + canvas.getActiveObjects()[i].width/2,
+                                top : canvas.getActiveObjects()[i].top + 3*canvas.getActiveObjects()[i].height/4
+                                })],
+                                {
+                                    name: "textGroup"
+                                });
+                                canvas.add(group);
+                                canvas.remove(canvas.getActiveObjects()[i]);
+                                canvas.setActiveObject(group);
+                            }
+                            else if (canvas.getActiveObjects()[i].name ==  "circle" ||
+                                canvas.getActiveObjects()[i].name == "ellipse")
+                            {
+                                var group = new fabric.Group([canvas.getActiveObjects()[i],
+                                new fabric.Text(key, {
+                                fontSize: Global.fontSize,
+                                fontFamily: Global.font,
+                                originX: 'center',
+                                originY: 'center',
+                                fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
+                                left: canvas.getActiveObjects()[i].left,
+                                top : canvas.getActiveObjects()[i].top
+                                })],
+                                {
+                                    name: "textGroup"
+                                });
+                                canvas.add(group);
+                                canvas.remove(canvas.getActiveObjects()[i]);
+                                canvas.setActiveObject(group);
+                            }
+                        }
+                        else
+                        {
+                            //it is a group
+                            canvas.getActiveObjects()[i].item(1).set({
+                                text: canvas.getActiveObjects()[i].item(1).text + key
+                            });
+                        }
+                        canvas.requestRenderAll();
+                        state.push(canvas.toDatalessJSON());
+                    }
+                }
+                
+            }
+        }
 
-        }); 
+        ); 
+document.addEventListener('keyup', function(event) {
+    const key = event.key;
+    if (key == "Control")
+    {
+        Global.cntr = false;
+    }
+});
 </script>
 
 </body>
