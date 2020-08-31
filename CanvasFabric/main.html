@@ -43,18 +43,12 @@ canvas
 </button>
 <button class="ms-Button">
     <span class="Button-label">Text</span> 
-</button>
-<button class="ms-Button">
-    <span class="Button-label">Text Box</span> 
-</button>          
+</button>        
 <button class="ms-Button">
     <span class="Button-label">Free Draw</span> 
 </button>   
 <button class="ms-Button">
     <span class="Button-label">Delete</span> 
-</button>  
-<button class="ms-Button">
-    <span class="Button-label">Change Color</span> 
 </button>  
 <button class="ms-Button">
     <span class="Button-label">Undo</span> 
@@ -64,7 +58,13 @@ canvas
 </button>
 <input type="color" value="#000000">
 <select id="input-font" class="input"
-        onchange="Global.font = (this.value);"> 
+onchange="{
+    Global.font = (this.value);
+    canvas.getActiveObjects().forEach((obj) => {
+    obj.fontFamily = Global.font;
+    });
+    canvas.requestRenderAll();
+    }"> 
   
         <option value='Times New Roman' selected="selected">Times New Roman</option> 
         <option value='Arial'>Arial</option> 
@@ -80,7 +80,15 @@ canvas
         <option value='Cambria'>Cambria</option> 
 </select>
 <select id="input-font" class="input"
-        onchange="Global.fontSize = parseInt((this.value), 10);"> 
+onchange="{
+    Global.fontSize = parseInt((this.value), 10);
+    canvas.getActiveObjects().forEach((obj) => {
+    obj.fontSize = Global.fontSize;
+    obj.strokeWidth = Global.fontSize/10;
+    canvas.freeDrawingBrush.width = Global.fontSize/10;
+    });
+    canvas.requestRenderAll();
+}"> 
   
         <option value='2'>2</option> 
         <option value='4'>4</option> 
@@ -132,13 +140,21 @@ var Global = {
     font: 'Times New Roman',
     cntr: false,
     c: false,
-    v: false
+    v: false,
+    sqrt2: Math.sqrt(2)
 }
 var state = []; //Saves
 state.push(canvas.toDatalessJSON());
 
 function hexToComplimentary(hex){
-
+if (hex == "#000000")
+{
+    return "#ffffff";
+}
+if (hex == "#ffffff")
+{
+    return "#000000";
+}
 var rgb = 'rgb(' + (hex = hex.replace('#', '')).match(new RegExp('(.{' + hex.length/3 + '})', 'g')).map(function(l) { return parseInt(hex.length%2 ? l+l : l, 16); }).join(',') + ')';
 
 rgb = rgb.replace(/[^\d,]/g, '').split(',');
@@ -200,6 +216,10 @@ g = Math.round(g * 255);
 b = Math.round(b * 255);
 
 rgb = b | (g << 8) | (r << 16); 
+
+
+
+
 return "#" + (0x1000000 | rgb).toString(16).substring(1);
 }  
 function copy() {
@@ -253,6 +273,7 @@ function rectangle(x,y)
     }
     else
     {
+
         Global.selectedObjectCreate.set({"width": x - Global.anchor.x, "height": y - Global.anchor.y});
         canvas.renderAll();
         Global.selectedObjectCreate.setCoords();
@@ -270,8 +291,8 @@ function circle(x, y)
         Global.selectedObjectCreate = new fabric.Circle({
         left: x,
         top: y,
-        originX: "center",
-        originY: "center",
+        //originX: "center",    //these are enabled for centre type
+        //originY: "center",
         fill: Global.outline?'transparent':Global.color,
         stroke: Global.color,
         radius: 0,
@@ -282,7 +303,10 @@ function circle(x, y)
     }
     else
     {
-        Global.selectedObjectCreate.set({"top":Global.anchor.y,"left":Global.anchor.x,"radius": Math.abs(x-Global.anchor.x)});
+        //Top left type
+        Global.selectedObjectCreate.set({"top":Global.anchor.y,"left":Global.anchor.x,"radius": Math.abs(x-Global.anchor.x)/2});
+        //Centre Type
+        //Global.selectedObjectCreate.set({"top":Global.anchor.y,"left":Global.anchor.x,"radius": Math.abs(x-Global.anchor.x)});
         canvas.renderAll();
         Global.selectedObjectCreate.setCoords();
     }
@@ -296,8 +320,8 @@ function ellipse(x,y)
         Global.selectedObjectCreate = new fabric.Ellipse({
         left: x,
         top: y,
-        originX: "center",
-        originY: "center",
+        //originX: "center",    //these are enabled for centre type
+        //originY: "center",
         fill: Global.outline?'transparent':Global.color,
         stroke: Global.color,
         rx: 0,
@@ -309,7 +333,10 @@ function ellipse(x,y)
     }
     else
     {
-        Global.selectedObjectCreate.set({"top":Global.anchor.y,"left":Global.anchor.x,"rx": Math.abs(x-Global.anchor.x),"ry": Math.abs(y-Global.anchor.y)});
+        //Top left type
+        Global.selectedObjectCreate.set({"top":Global.anchor.y,"left":Global.anchor.x,"rx": Math.abs(x-Global.anchor.x)/2,"ry": Math.abs(y-Global.anchor.y)/2});
+        //Centre Type
+        //Global.selectedObjectCreate.set({"top":Global.anchor.y,"left":Global.anchor.x,"rx": Math.abs(x-Global.anchor.x),"ry": Math.abs(y-Global.anchor.y)});
         canvas.renderAll();
         Global.selectedObjectCreate.setCoords();
     }
@@ -371,16 +398,17 @@ function arrow(x, y)
         var length = Math.sqrt(Math.pow(x-Global.anchor.x,2)+Math.pow(y-Global.anchor.y,2));
         var theta = Math.atan((y-Global.anchor.y)/(x-Global.anchor.x));
         var headRatio = 0.3;
+        var arrowHeadMax = 200;
         Global.selectedObjectCreate.set({"y2":y,"x2":x});
         Global.arrowLeft.set({  "y1":y,
                                 "x1":x,
-                                "y2":y+headRatio*length*((x-Global.anchor.x)>0?(-Math.sin(Math.PI-theta-Math.PI/6)):(Math.sin(Math.PI-theta-Math.PI/6))),
-                                "x2":x+headRatio*length*((x-Global.anchor.x)>0?(Math.cos(Math.PI-theta-Math.PI/6)):(-Math.cos(Math.PI-theta-Math.PI/6))),
+                                "y2":y+headRatio*(length>arrowHeadMax?arrowHeadMax:length)*((x-Global.anchor.x)>=0?(-Math.sin(Math.PI-theta-Math.PI/6)):(Math.sin(Math.PI-theta-Math.PI/6))),
+                                "x2":x+headRatio*(length>arrowHeadMax?arrowHeadMax:length)*((x-Global.anchor.x)>=0?(Math.cos(Math.PI-theta-Math.PI/6)):(-Math.cos(Math.PI-theta-Math.PI/6))),
         });
         Global.arrowRight.set({ "y1":y,
                                 "x1":x,
-                                "y2":y+headRatio*length*((x-Global.anchor.x)>0?(-Math.sin(Math.PI-theta+Math.PI/6)):(Math.sin(Math.PI-theta+Math.PI/6))),
-                                "x2":x+headRatio*length*((x-Global.anchor.x)>0?(Math.cos(Math.PI-theta+Math.PI/6)):(-Math.cos(Math.PI-theta+Math.PI/6))),
+                                "y2":y+headRatio*(length>arrowHeadMax?arrowHeadMax:length)*((x-Global.anchor.x)>=0?(-Math.sin(Math.PI-theta+Math.PI/6)):(Math.sin(Math.PI-theta+Math.PI/6))),
+                                "x2":x+headRatio*(length>arrowHeadMax?arrowHeadMax:length)*((x-Global.anchor.x)>=0?(Math.cos(Math.PI-theta+Math.PI/6)):(-Math.cos(Math.PI-theta+Math.PI/6))),
         });
         canvas.renderAll();
         Global.selectedObjectCreate.setCoords();
@@ -426,6 +454,7 @@ function text(x, y)
     name: 'text'
     });
     canvas.add(Global.selectedObjectCreate);
+    canvas.setActiveObject(Global.selectedObjectCreate);
 }
 function create(type)
 {
@@ -460,10 +489,6 @@ function create(type)
         case "freeDraw":
             canvas.isDrawingMode = true;
         break;
-        case "delete":
-            console.log(canvas.getActiveObject());
-            canvas.requestRenderAll();
-        break;
     }
 }
 
@@ -496,49 +521,62 @@ new fabric['Button'](ButtonElements[7], function() {
       Mouse.tool = "text";
 });
 new fabric['Button'](ButtonElements[8], function() {
-      Mouse.tool = "textBox";
-});
-new fabric['Button'](ButtonElements[9], function() {
     Mouse.tool = "freeDraw";
+    canvas.freeDrawingBrush.width = Global.fontSize/10;
+    canvas.freeDrawingBrush.color = Global.color;
     canvas.selection = false;
     canvas.isDrawingMode = true;
 });
-new fabric['Button'](ButtonElements[10], function() {
-    Mouse.tool = "delete";
+new fabric['Button'](ButtonElements[9], function() {
+    Mouse.tool = "default";
     canvas.getActiveObjects().forEach((obj) => {
     canvas.remove(obj)
     });
     canvas.discardActiveObject().renderAll();
       
 });
-new fabric['Button'](ButtonElements[11], function() {
-    Mouse.tool = "changeColor";
-    canvas.getActiveObjects().forEach((obj) => {
-    obj.fill = Global.color;
-    obj.stroke = Global.color;
-    });
-    if (canvas.getActiveObject()!= null)
-        canvas.getActiveObject().set({
-            "fill": Global.color,
-            "stroke": Global.color
-            });
-    
-    canvas.discardActiveObject().renderAll();
-      
-});
-new fabric['Button'](ButtonElements[12], function() {
+new fabric['Button'](ButtonElements[10], function() {
     //Undo
     canvas.loadFromJSON(state[state.length-2], function()
     {
         state.pop();
     });
 });
-new fabric['Button'](ButtonElements[13], function() {
+new fabric['Button'](ButtonElements[11], function() {
     //JSON export
     console.log(JSON.stringify(canvas));
 });
-new fabric['Button'](ButtonElements[14], function() {
+new fabric['Button'](ButtonElements[12], function() {
     Global.outline = !Global.outline;
+    canvas.getActiveObjects().forEach((obj) => {
+    if (obj.name == "textGroup")
+    {
+        if (obj.item(0).fill == obj.item(0).stroke)
+        {
+            obj.item(1).fill = obj.item(0).fill;
+            obj.item(0).fill = 'transparent';
+        }
+        else
+        {
+            obj.item(1).fill = hexToComplimentary(obj.item(0).stroke);
+            obj.item(0).fill = obj.item(0).stroke;
+        }
+        //doesnt update without resizing/typing more
+    }
+    else
+    {
+        if (obj.fill == obj.stroke)
+    {
+        obj.fill = 'transparent';
+    }
+        else
+        {
+            obj.fill = obj.stroke;
+        }
+    }
+    
+    });
+    canvas.requestRenderAll();
 });
 canvas.on('mouse:down', function(options) {
     
@@ -546,26 +584,47 @@ canvas.on('mouse:down', function(options) {
     if (canvas.getActiveObject() == null)
     {
         Global.creating = true;
-        create(Mouse.tool);
+        if (Mouse.tool != "default")
+        {
+            create(Mouse.tool);
+            if (Global.selectedObjectCreate != null)
+                canvas.setActiveObject(Global.selectedObjectCreate);
+        }
     }
     else
     {
         canvas.getActiveObject().lockMovementX = false;
         canvas.getActiveObject().lockMovementY = false;
-        if ((canvas.getActiveObject().name != Mouse.tool) && Mouse.tool != "default")
+        if (canvas.getActiveObject().name == "textGroup")
         {
-            canvas.getActiveObject().lockMovementX = true;
-            canvas.getActiveObject().lockMovementY = true;
-            canvas.discardActiveObject().renderAll();
-            create(Mouse.tool);
-            
-            
+            if ((canvas.getActiveObject().item(0).name != Mouse.tool) && Mouse.tool != "default")
+            {
+                canvas.getActiveObject().lockMovementX = true;
+                canvas.getActiveObject().lockMovementY = true;
+                canvas.discardActiveObject().renderAll();
+                create(Mouse.tool);
+            }
+            else
+            {
+                Mouse.tool = "default";
+            }
         }
-
         else
         {
-            Mouse.tool = "default";
+            if ((canvas.getActiveObject().name != Mouse.tool) && Mouse.tool != "default")
+            {
+                canvas.getActiveObject().lockMovementX = true;
+                canvas.getActiveObject().lockMovementY = true;
+                canvas.discardActiveObject().renderAll();
+                create(Mouse.tool);
+                
+            }
+            else
+            {
+                Mouse.tool = "default";
+            }
         }
+        
     }
     
 
@@ -586,7 +645,26 @@ canvas.on('mouse:up', function(options) {
         canvas.remove(Global.selectedObjectCreate);
         canvas.remove(Global.arrowLeft);
         canvas.remove(Global.arrowRight);
+        Global.selectedObjectCreate = canvas._objects[canvas._objects.length-1];
+        canvas.setActiveObject(Global.selectedObjectCreate);
     }
+    if (Global.selectedObjectCreate != null)
+        if (Global.selectedObjectCreate.name == "rectangle" || Global.selectedObjectCreate.name == "triangle")
+        {
+            if (Global.selectedObjectCreate.width < 0)
+                Global.selectedObjectCreate.set({"left": Global.selectedObjectCreate.left + Global.selectedObjectCreate.width, "width":Math.abs(Global.selectedObjectCreate.width) });
+            if (Global.selectedObjectCreate.height < 0)
+            {
+                if (Global.selectedObjectCreate.name == "triangle")
+                {
+                    Global.selectedObjectCreate.angle = 180;
+                    Global.selectedObjectCreate.top -= Global.selectedObjectCreate.height;
+                    Global.selectedObjectCreate.left += Global.selectedObjectCreate.width;
+                }
+                Global.selectedObjectCreate.set({"top": Global.selectedObjectCreate.top + Global.selectedObjectCreate.height, "height":Math.abs(Global.selectedObjectCreate.height) });
+            }
+            canvas.requestRenderAll();
+        }
     Global.selectedObjectCreate = null;
     Global.arrowLeft = null;
     Global.arrowRight = null;
@@ -630,13 +708,35 @@ canvas.on('mouse:move', function(options) {
 document.addEventListener("change", watchColorPicker, false);
 document.addEventListener("input", watchColorPicker, false);
 function watchColorPicker(event) {
-    Global.color = event.target.value;
-    canvas.getActiveObjects().forEach((obj) => {
-    obj.fill = Global.color;
-    obj.stroke = Global.color;
-    });
-    canvas.requestRenderAll();
-    
+    if (event.target.value[0] == "#")
+    {
+        canvas.freeDrawingBrush.color = Global.color;
+        Global.color = event.target.value;
+        canvas.getActiveObjects().forEach((obj) => {
+
+            if (obj.name == "textGroup")
+            {
+                obj.item(0).set({fill: Global.color});
+                obj.item(0).set({stroke: Global.color});
+            }
+            else if (obj.name == "arrow")
+            {
+                obj.item(0).set({stroke: Global.color});
+                obj.item(1).set({stroke: Global.color});
+                obj.item(2).set({stroke: Global.color});
+            }
+            else
+            {
+                obj.set({
+                    fill: obj.fill == obj.stroke ? Global.color : 'transparent',
+                    stroke: Global.color
+                })
+            }
+        });
+        canvas.requestRenderAll();
+    }
+    if (event.target.value[0] > -1)
+        canvas.freeDrawingBrush.width = Global.fontSize/10;
 }
 
 
@@ -660,6 +760,8 @@ document.addEventListener('keydown', function(event) {
                 {
                     copy();
                 }
+                else
+                {
                 for (var i = 0; i < canvas.getActiveObjects().length; ++i)
                 {
                     switch(key)
@@ -667,14 +769,15 @@ document.addEventListener('keydown', function(event) {
                         case "Backspace":
                         if (canvas.getActiveObjects()[i].name == "textGroup")
                         {
-                            canvas.getActiveObjects()[i].item(1).text = "";
+                            canvas.getActiveObjects()[i].item(1).set({text: ""});
                         }
-                        else
+                        if (canvas.getActiveObjects()[i].name == "text")
                         {   
-                            canvas.getActiveObjects()[i].text = "";
-                            canvas.requestRenderAll();
-                            state.push(canvas.toDatalessJSON());
+                            canvas.getActiveObjects()[i].set({text: ""});
                         }
+                        canvas.requestRenderAll();
+                        state.push(canvas.toDatalessJSON());
+                        
                         break;
                         case "Delete":
                         canvas.getActiveObjects().forEach((obj) => {
@@ -689,6 +792,7 @@ document.addEventListener('keydown', function(event) {
                         case "Tab": break;
                         case "CapsLock": break;
                         case "Control": break;
+                        case "Enter": break;
                         case "OS": break;
                         case "ContextMenu": break;
                         case "Insert": break;
@@ -698,6 +802,7 @@ document.addEventListener('keydown', function(event) {
                         case "PageDown": break;
                         case "Pause": break;
                         case "ScrollLock": break;
+                        case "Meta": break;
                         case "NumLock": break;
                         case "ArrowDown": break;
                         case "ArrowUp": break;
@@ -716,83 +821,119 @@ document.addEventListener('keydown', function(event) {
                         case "F11": break;
                         case "F12": break;
                         default:
-                        canvas.getActiveObjects()[i].text += key;
-                        
-                        
-                        //if not a textGroup
-                        if (canvas.getActiveObjects()[i].name != "textGroup")
+                        if (canvas.getActiveObjects()[i].name == "text")
                         {
-                            if (canvas.getActiveObjects()[i].name == "rectangle")
-                            {
-                                var group = new fabric.Group([canvas.getActiveObjects()[i],
-                                new fabric.Text(key, {
-                                fontSize: Global.fontSize,
-                                fontFamily: Global.font,
-                                originX: 'center',
-                                originY: 'center',
-                                fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
-                                left: canvas.getActiveObjects()[i].left + canvas.getActiveObjects()[i].width/2,
-                                top : canvas.getActiveObjects()[i].top + canvas.getActiveObjects()[i].height/2
-                                })],
-                                {
-                                    name: "textGroup"
-                                });
-                                canvas.add(group);
-                                canvas.remove(canvas.getActiveObjects()[i]);
-                                canvas.setActiveObject(group);
-                            }
-                            else if (canvas.getActiveObjects()[i].name == "triangle")
-                            {
-                                var group = new fabric.Group([canvas.getActiveObjects()[i],
-                                new fabric.Text(key, {
-                                fontSize: Global.fontSize,
-                                fontFamily: Global.font,
-                                originX: 'center',
-                                originY: 'center',
-                                fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
-                                left: canvas.getActiveObjects()[i].left + canvas.getActiveObjects()[i].width/2,
-                                top : canvas.getActiveObjects()[i].top + 3*canvas.getActiveObjects()[i].height/4
-                                })],
-                                {
-                                    name: "textGroup"
-                                });
-                                canvas.add(group);
-                                canvas.remove(canvas.getActiveObjects()[i]);
-                                canvas.setActiveObject(group);
-                            }
-                            else if (canvas.getActiveObjects()[i].name ==  "circle" ||
-                                canvas.getActiveObjects()[i].name == "ellipse")
-                            {
-                                var group = new fabric.Group([canvas.getActiveObjects()[i],
-                                new fabric.Text(key, {
-                                fontSize: Global.fontSize,
-                                fontFamily: Global.font,
-                                originX: 'center',
-                                originY: 'center',
-                                fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
-                                left: canvas.getActiveObjects()[i].left,
-                                top : canvas.getActiveObjects()[i].top
-                                })],
-                                {
-                                    name: "textGroup"
-                                });
-                                canvas.add(group);
-                                canvas.remove(canvas.getActiveObjects()[i]);
-                                canvas.setActiveObject(group);
-                            }
+                            canvas.getActiveObjects()[i].text += key;
                         }
                         else
                         {
-                            //it is a group
-                            canvas.getActiveObjects()[i].item(1).set({
-                                text: canvas.getActiveObjects()[i].item(1).text + key
-                            });
+                            if (canvas.getActiveObjects().length > 1)
+                            {
+                                break;
+                            }
+                            //if not a textGroup
+                            if (canvas.getActiveObjects()[i].name != "textGroup")
+                            {
+                                if (canvas.getActiveObjects()[i].name == "rectangle")
+                                {
+                                    var crossLength = Math.sqrt(Math.pow(canvas.getActiveObjects()[i].width/2,2)+Math.pow(canvas.getActiveObjects()[i].height/2,2));
+                                    var theta = Math.atan(canvas.getActiveObjects()[i].width/canvas.getActiveObjects()[i].height);
+                                    var group = new fabric.Group([canvas.getActiveObjects()[i],
+                                    new fabric.Text(key, {
+                                    fontSize: Global.fontSize,
+                                    fontFamily: Global.font,
+                                    originX: 'center',
+                                    originY: 'center',
+                                    angle: canvas.getActiveObjects()[i].angle,
+                                    fill: hexToComplimentary(canvas.getActiveObjects()[i].fill == 'transparent' ? canvas.getActiveObjects()[i].stroke : canvas.getActiveObjects()[i].fill),
+                                    left: canvas.getActiveObjects()[i].left - Math.sin((canvas.getActiveObjects()[i].angle - theta * 180/Math.PI)*Math.PI/180) * crossLength,
+                                    top : canvas.getActiveObjects()[i].top + Math.cos((canvas.getActiveObjects()[i].angle - theta * 180/Math.PI)*Math.PI/180) * crossLength
+                                    })],
+                                    {
+                                        name: "textGroup"
+                                    });
+                                    canvas.add(group);
+                                    canvas.remove(canvas.getActiveObjects()[i]);
+                                    canvas.setActiveObject(group);
+                                }
+                                else if (canvas.getActiveObjects()[i].name == "triangle")
+                                {
+                                    var crossLength = Math.sqrt(Math.pow(canvas.getActiveObjects()[i].width/2,2)+Math.pow(canvas.getActiveObjects()[i].height/2,2));
+                                    var theta = Math.atan(canvas.getActiveObjects()[i].width/canvas.getActiveObjects()[i].height);
+                                    var group = new fabric.Group([canvas.getActiveObjects()[i],
+                                    new fabric.Text(key, {
+                                    fontSize: Global.fontSize,
+                                    fontFamily: Global.font,
+                                    originX: 'center',
+                                    originY: 'center',
+                                    angle: canvas.getActiveObjects()[i].angle,
+                                    fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
+                                    left: canvas.getActiveObjects()[i].left - Math.sin((canvas.getActiveObjects()[i].angle - theta * 180/Math.PI)*Math.PI/180) * crossLength,
+                                    top : canvas.getActiveObjects()[i].top + Math.cos((canvas.getActiveObjects()[i].angle - theta * 180/Math.PI)*Math.PI/180) * crossLength
+                                    })],
+                                    {
+                                        name: "textGroup"
+                                    });
+                                    canvas.add(group);
+                                    canvas.remove(canvas.getActiveObjects()[i]);
+                                    canvas.setActiveObject(group);
+                                }
+                                else if (canvas.getActiveObjects()[i].name ==  "circle")
+                                {
+                                    var group = new fabric.Group([canvas.getActiveObjects()[i],
+                                    new fabric.Text(key, {
+                                    fontSize: Global.fontSize,
+                                    fontFamily: Global.font,
+                                    originX: 'center',
+                                    originY: 'center',
+                                    angle: canvas.getActiveObjects()[i].angle,
+                                    fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
+                                    left: canvas.getActiveObjects()[i].left + Global.sqrt2*Math.cos((canvas.getActiveObjects()[i].angle+45)*Math.PI/180)*canvas.getActiveObjects()[i].radius,
+                                    top : canvas.getActiveObjects()[i].top + Global.sqrt2*Math.cos((canvas.getActiveObjects()[i].angle-45)*Math.PI/180)*canvas.getActiveObjects()[i].radius
+                                    })],
+                                    {
+                                        name: "textGroup"
+                                    });
+                                    canvas.add(group);
+                                    canvas.remove(canvas.getActiveObjects()[i]);
+                                    canvas.setActiveObject(group);
+                                }
+                                else if (canvas.getActiveObjects()[i].name ==  "ellipse")
+                                {
+                                    var crossLength = Math.sqrt(Math.pow(canvas.getActiveObjects()[i].rx,2)+Math.pow(canvas.getActiveObjects()[i].ry,2));
+                                    var theta = Math.atan(canvas.getActiveObjects()[i].rx/canvas.getActiveObjects()[i].ry);
+                                    var group = new fabric.Group([canvas.getActiveObjects()[i],
+                                    new fabric.Text(key, {
+                                    fontSize: Global.fontSize,
+                                    fontFamily: Global.font,
+                                    originX: 'center',
+                                    originY: 'center',
+                                    angle: canvas.getActiveObjects()[i].angle,
+                                    fill: hexToComplimentary(canvas.getActiveObjects()[i].fill),
+                                    left: canvas.getActiveObjects()[i].left - Math.sin((canvas.getActiveObjects()[i].angle - theta * 180/Math.PI)*Math.PI/180) * crossLength,
+                                    top : canvas.getActiveObjects()[i].top + Math.cos((canvas.getActiveObjects()[i].angle - theta * 180/Math.PI)*Math.PI/180) * crossLength
+                                    })],
+                                    {
+                                        name: "textGroup"
+                                    });
+                                    canvas.add(group);
+                                    canvas.remove(canvas.getActiveObjects()[i]);
+                                    canvas.setActiveObject(group);
+                                }
+                            }
+                            else
+                            {
+                                //it is a group
+                                canvas.getActiveObjects()[i].item(1).set({
+                                    text: canvas.getActiveObjects()[i].item(1).text + key
+                                });
+                            }
                         }
                         canvas.requestRenderAll();
                         state.push(canvas.toDatalessJSON());
                     }
                 }
-                
+            }
             }
         }
 
